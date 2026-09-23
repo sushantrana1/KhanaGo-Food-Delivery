@@ -10,31 +10,55 @@ export const initiateEsewa = async (user, order) => {
   if (!config.esewa.merchantId || !config.esewa.secretKey) {
     throw new ApiError("eSewa credentials not configured", 500);
   }
+
   const transactionId = `ESW-${Date.now()}`;
   const amount = order.total.toFixed(2);
   const tax = order.tax.toFixed(2);
   const total = order.total.toFixed(2);
+
   const signedFieldNames = "total_amount,transaction_uuid,product_code";
   const signedFieldValues = `${total},${transactionId},${config.esewa.merchantId}`;
-  const signature = crypto.createHmac("sha256", config.esewa.secretKey).update(signedFieldValues).digest("base64");
+  const signature = crypto
+    .createHmac("sha256", config.esewa.secretKey)
+    .update(signedFieldValues)
+    .digest("base64");
 
-  const form = new URLSearchParams();
-  form.append("amount", amount);
-  form.append("tax", tax);
-  form.append("total", total);
-  form.append("transaction_uuid", transactionId);
-  form.append("product_code", config.esewa.merchantId);
-  form.append("product_service_charge", "0");
-  form.append("product_delivery_charge", "0");
-  form.append("success_url", `${config.clientUrl}/checkout/verify?provider=esewa`);
-  form.append("failure_url", `${config.clientUrl}/checkout/verify?provider=esewa`);
-  form.append("signed_field_names", signedFieldNames);
-  form.append("signature", signature);
+  // Return form fields for the frontend to auto-submit
+  const formFields = {
+    amount,
+    tax_amount: tax,
+    total_amount: total,
+    transaction_uuid: transactionId,
+    product_code: config.esewa.merchantId,
+    product_service_charge: "0",
+    product_delivery_charge: "0",
+    success_url: `${config.clientUrl}/checkout/verify?provider=esewa`,
+    failure_url: `${config.clientUrl}/checkout/verify?provider=esewa`,
+    signed_field_names: signedFieldNames,
+    signature,
+  };
 
-  return { paymentUrl: `${ESEWA_BASE}/wms/order/`, transactionId };
+  return {
+    paymentUrl: `${ESEWA_BASE}/wms/order/`,
+    formFields,
+    transactionId,
+  };
 };
 
 export const verifyEsewa = async (transactionId) => {
-  const response = await client.get(`${ESEWA_BASE}/wms/order/status/`, { params: { transaction_uuid: transactionId } });
-  return response.data?.status === "COMPLETED";
+  try {
+    const response = await client.get(
+      `${ESEWA_BASE}/wms/order/status/`,
+      {
+        params: {
+          transaction_uuid: transactionId,
+          product_code: config.esewa.merchantId,
+        },
+      }
+    );
+    return response.data?.status === "COMPLETED";
+  } catch (err) {
+    console.error("eSewa verify failed:", err.message);
+    return false;
+  }
 };

@@ -1,8 +1,8 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL:
-    "https://food-delivery-server-6lut.onrender.com/api",
+  baseURL: import.meta.env.VITE_API_URL || "/api",
+  withCredentials: true,
 });
 
 api.interceptors.request.use((config) => {
