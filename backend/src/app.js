@@ -25,13 +25,15 @@ const app = express();
 // CORS
 // ─────────────────────────────────────────────
 const allowedOrigins = [
+  // Local development
   "http://localhost:5173",
   "http://localhost:3000",
   "http://localhost:5000",
 
-  // Old Vercel deployments
-  "https://food-delivery-6klnqek5i-abisheks-projects-68801856.vercel.app",
-  "https://food-delivery-38tn1lx61-abisheks-projects-68801856.vercel.app",
+  // Production — Vercel frontend
+  "https://khana-go-food-delivery.vercel.app",
+
+  // Legacy / alternate URLs
   "https://food-delivery-client-7qjz.onrender.com",
 ];
 
@@ -46,11 +48,20 @@ app.use(
         return callback(null, true);
       }
 
+      // Allow any Vercel preview deployment for this project
+      if (
+        /^https:\/\/khana-go-food-delivery(-[a-z0-9]+)?\.vercel\.app$/.test(
+          origin
+        )
+      ) {
+        return callback(null, true);
+      }
+
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
 
-      console.log("❌ CORS blocked:", origin);
+      console.log("CORS blocked:", origin);
       return callback(null, false);
     },
     credentials: true,
@@ -62,11 +73,20 @@ app.use(
 // ─────────────────────────────────────────────
 // Security & Parsers
 // ─────────────────────────────────────────────
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 app.use(mongoSanitize());
+
+// ─────────────────────────────────────────────
+// Trust proxy (needed on Render for rate-limit + secure cookies)
+// ─────────────────────────────────────────────
+app.set("trust proxy", 1);
 
 // ─────────────────────────────────────────────
 // Rate Limiting
@@ -102,7 +122,7 @@ app.use("/api/auth", authLimiter);
 app.get("/", (req, res) => {
   res.json({
     status: "success",
-    message: "KhanaGo API Running 🍛⚡",
+    message: "KhanaGo API Running",
   });
 });
 
